@@ -2,9 +2,9 @@
 
 #include "util.hpp"
 
-TEST(insert_equal, case0) {
+TEST(insert_unique, case0) {
     auto rv = bit::get_random_vector(1024);
-    auto sv = bit::get_sorted_vector(1024);
+    auto sv = bit::get_unique_vector(1024);
     bit::TestClass::reset();
 
     {
@@ -13,14 +13,21 @@ TEST(insert_equal, case0) {
         std::unordered_set<void *>ss;
 
         for (const auto &i : rv) {
-            auto it = sls.insert_equal(i);
-            ASSERT_EQ(ss.count(it.base()), 0);
-            ASSERT_EQ(i, *it);
-            ss.emplace(it.base());
+            bool s = sls.contain(i);
+            auto [it, status] = sls.insert_unique(i);
+            if (s) {
+                ASSERT_FALSE(status);
+                ASSERT_TRUE(!it);
+            } else {
+                ASSERT_TRUE(status);
+                ASSERT_EQ(ss.count(it.base()), 0);
+                ASSERT_EQ(i, *it);
+                ss.emplace(it.base());
+            }
         }
 
-        ASSERT_EQ(ss.size(), rv.size());
-        ASSERT_EQ(sls.size(), rv.size());
+        ASSERT_EQ(ss.size(), sv.size());
+        ASSERT_EQ(sls.size(), sv.size());
 
         auto slit = sls.begin();
         auto svit = sv.begin();
@@ -30,7 +37,7 @@ TEST(insert_equal, case0) {
     }
 
     ASSERT_EQ(0, bit::TestClass::init_ctor);
-    ASSERT_EQ(rv.size(), bit::TestClass::copy_ctor);
+    ASSERT_EQ(sv.size(), bit::TestClass::copy_ctor);
     ASSERT_EQ(0, bit::TestClass::move_ctor);
     ASSERT_EQ(0, bit::TestClass::copy_assign);
     ASSERT_EQ(0, bit::TestClass::move_assign);
@@ -38,84 +45,9 @@ TEST(insert_equal, case0) {
     ASSERT_TRUE(bit::TestClass::check());
 }
 
-TEST(insert_equal, case1) {
-    constexpr int loop = 2;
+TEST(insert_unique, case1) {
     auto rv = bit::get_random_vector(1024);
-    auto sv = bit::get_sorted_vector(1024);
-    bit::TestClass::reset();
-
-    {
-        bit::sl_set<bit::TestClass> sls;
-
-        std::unordered_set<void *>ss;
-
-        for (const auto &i : rv) {
-            auto it = sls.insert_equal(loop, i);
-
-            ASSERT_EQ(ss.count(it.base()), 0);
-            ASSERT_EQ(i, *it);
-            ss.emplace(it.base());
-
-            int tmp = loop;
-            while (--tmp) {
-                ++it;
-                ASSERT_EQ(ss.count(it.base()), 0);
-                ASSERT_EQ(i, *it);
-                ss.emplace(it.base());
-            }
-        }
-
-        ASSERT_EQ(sls.size(), rv.size() * 2);
-
-        auto slit = sls.begin();
-        auto svit = sv.begin();
-        while (slit != sls.end() && svit != sv.end()) {
-            int tmp = loop;
-            while (tmp--) {
-                ASSERT_EQ(*slit++, *svit);
-            }
-            ++svit;
-        }
-    }
-
-    ASSERT_EQ(0, bit::TestClass::init_ctor);
-    ASSERT_EQ(loop * rv.size(), bit::TestClass::copy_ctor);
-    ASSERT_EQ(0, bit::TestClass::move_ctor);
-    ASSERT_EQ(0, bit::TestClass::copy_assign);
-    ASSERT_EQ(0, bit::TestClass::move_assign);
-
-    ASSERT_TRUE(bit::TestClass::check());
-}
-
-TEST(insert_equal, case2) {
-    auto rv = bit::get_random_vector(1024);
-    auto sv = bit::get_sorted_vector(1024);
-    bit::TestClass::reset();
-
-    {
-        bit::sl_set<bit::TestClass> sls;
-        std::unordered_set<void *>ss;
-
-        for (const auto &i : rv) {
-            auto it = sls.insert_equal(0, i);
-            assert(!it);
-        }
-
-        ASSERT_EQ(sls.size(), 0);
-    }
-
-    ASSERT_EQ(0, bit::TestClass::init_ctor);
-    ASSERT_EQ(0, bit::TestClass::copy_ctor);
-    ASSERT_EQ(0, bit::TestClass::move_ctor);
-    ASSERT_EQ(0, bit::TestClass::copy_assign);
-    ASSERT_EQ(0, bit::TestClass::move_assign);
-
-    ASSERT_TRUE(bit::TestClass::check());
-}
-
-TEST(insert_equal, case3) {
-    auto rv = bit::get_random_vector(1024);
-    auto sv = bit::get_sorted_vector(1024);
+    auto sv = bit::get_unique_vector(1024);
     bit::TestClass::reset();
 
     {
@@ -135,21 +67,28 @@ TEST(insert_equal, case3) {
         bit::sl_set<bit::TestClass> test;
 
         for (auto i = sls.begin();i != sls.end();++i) {
-            auto it = test.insert_equal(i);
-            ASSERT_EQ(ss.count(it.base()), 0);
-            ASSERT_EQ(*i, *it);
-            ss.emplace(it.base());
+            auto b = test.contain(*i);
+            auto [it, status] = test.insert_unique(i);
+            if (b) {
+                ASSERT_FALSE(status);
+                ASSERT_TRUE(!it);
+            } else {
+                ASSERT_TRUE(status);
+                ASSERT_EQ(ss.count(it.base()), 0);
+                ASSERT_EQ(*i, *it);
+                ss.emplace(it.base());
+            }
         }
 
-        auto slit = sls.begin();
+        auto slit = sv.begin();
         auto svit = test.begin();
-        while (slit != sls.end() && svit != test.end()) {
+        while (slit != sv.end() && svit != test.end()) {
             ASSERT_EQ(*slit++, *svit++);
         }
     }
 
     ASSERT_EQ(0, bit::TestClass::init_ctor);
-    ASSERT_EQ(2 * rv.size(), bit::TestClass::copy_ctor);
+    ASSERT_EQ(sv.size() + rv.size(), bit::TestClass::copy_ctor);
     ASSERT_EQ(0, bit::TestClass::move_ctor);
     ASSERT_EQ(0, bit::TestClass::copy_assign);
     ASSERT_EQ(0, bit::TestClass::move_assign);
@@ -157,15 +96,15 @@ TEST(insert_equal, case3) {
     ASSERT_TRUE(bit::TestClass::check());
 }
 
-TEST(insert_equal, case4) {
+TEST(insert_unique, case2) {
     auto rv = bit::get_random_vector(1024);
-    auto sv = bit::get_sorted_vector(1024);
+    auto sv = bit::get_unique_vector(1024);
     bit::TestClass::reset();
 
     {
         bit::sl_set<bit::TestClass> sls;
 
-        std::unordered_set<void *>ss;
+        std::unordered_set<void *> ss;
 
         for (const auto &i : rv) {
             auto it = sls.insert_equal(i);
@@ -177,17 +116,17 @@ TEST(insert_equal, case4) {
         ASSERT_EQ(sls.size(), rv.size());
 
         bit::sl_set<bit::TestClass> test;
-        test.insert_equal(sls.begin(), sls.end());
+        test.insert_unique(sls.begin(), sls.end());
 
-        auto slit = sls.begin();
+        auto slit = sv.begin();
         auto svit = test.begin();
-        while (slit != sls.end() && svit != test.end()) {
+        while (slit != sv.end() && svit != test.end()) {
             ASSERT_EQ(*slit++, *svit++);
         }
     }
 
     ASSERT_EQ(0, bit::TestClass::init_ctor);
-    ASSERT_EQ(2 * rv.size(), bit::TestClass::copy_ctor);
+    ASSERT_EQ(sv.size() + rv.size(), bit::TestClass::copy_ctor);
     ASSERT_EQ(0, bit::TestClass::move_ctor);
     ASSERT_EQ(0, bit::TestClass::copy_assign);
     ASSERT_EQ(0, bit::TestClass::move_assign);
@@ -195,25 +134,21 @@ TEST(insert_equal, case4) {
     ASSERT_TRUE(bit::TestClass::check());
 }
 
-TEST(insert_equal, case5) {
+TEST(insert_unique, case3) {
     std::initializer_list<bit::TestClass> rv{ 1168279878, 648950709, 1557551347, 1639869941, 464383696, 2018984925, 1732267505, 731933550, 1759229197, 1936329093, 1656394763, 290145158, 1001481218, 363159927, 434477296, 1205024133, 93216331, 401868523, 131297040, 401203082, 527644327, 950951356, 1795739910, 141892289, 1609005591, 1585191733, 1045927446, 590357943, 1168279878, 783035739, 562165088, 303528882, 1314384008, 436476769, 222902970, 88949714, 1133598294, 593550213, 16977872, 293823023, 1032406151, 456880398, 905333257, 2033732743, 1521446979, 517100456, 1463179851, 1725782669, 1931706889, 1413182980, 1223911131, 608452374, 1293320727, 1795289991, 201098412, 1045501369, 1059256538, 1177605153, 2090245053, 1102246881, 746232674, 2045329869, 1109242889, 484836575, 1358406342, 1293320727, 67989257, 790709217, 222902970, 1479904490, 1178402197, 785214199, 1746407391, 575542598, 1141231426, 459380632, 1280276410, 851451193, 585066582, 9135230, 1318824510, 1174619516, 64510905, 534195436, 208657547, 600168342, 1937572062, 1311533991, 1647259578, 601535872, 8200009, 791615942, 804493648, 1141231426, 657821122, 1116666770, 1688431512, 813799942, 1398644500, 994411018, 739972376, 514943163, 1654838121, 878918397, 115307826, 1448891846, 1771024151, 1305359607, 739972376, 510796578, 605925149, 1047660756, 1844185783, 1595884378, 2111482796, 118710298, 959637303, 1311978009, 218264606, 347221710, 1755174369, 2045329869, 1179459081, 680778346, 2018044935, 1746721616, 224214502, 795054872, 767780551, 263081549, 318665975, 1073005946, 1508134030, 484684157, 495053399, 1528073013, 1262976196, 1743764687, 1871067778, 1545747466, 194847407, 1096883512, 172556928, 1227559554, 892053143, 146704066, 1363045321, 1010026260, 368478899, 1286759526, 390801192, 1398526474, 412281976, 1817469861, 463482573, 1633413199, 1948318019, 1670147525, 1279743898, 1078626765, 1257726609, 1971340604, 175530179, 937186356, 1799809564, 1760348380, 1380786642, 1096989446, 1041071866, 830447845, 1887637, 434826719, 1484404192, 988774856, 778662570, 1121122751, 304987843, 1854052993, 407209931, 68372450, 2038299452, 702715826, 316824711, 1258459316, 873488586, 1457850877, 1351345222, 1588552611, 2143811609, 753972433, 1169606051, 530371949, 476026938, 2062571390, 1968156021, 353657795, 4234387, 1270697083, 822102917, 489115890, 1651659859, 208017828, 660405116, 1936672707, 1102246881, 1227464302, 302173464, 759417217, 191110288, 578134255, 1451839080, 290145158, 1859803063, 1679612135, 286810814, 1939824519, 650410715, 158592369, 1416685494, 768094284, 1993997924, 1258459316, 1152185683, 2139020934, 510556226, 364988340, 287957429, 265094609, 1702482604, 546669517, 971307216, 1094482709, 454233501, 1252027080, 1340040767, 1671212679, 1003245707, 1283070433, 653136424, 73536495, 1524325967, 457858130, 164973470, 1400258742, 987333028, 154578721, 1073005946, 1457850877, 1109242889, 1404280277, 1073254664, 2009907126, 831898620, 1624842918, 1245245249, 1148637873, 1288775054, 1016168507, 73536495, 1611739815, 1323121950, 1505795334, 821225632, 605925149, 1956041514, 2063936097, 436476769, 832633820, 1474833168, 1301377875, 322791559, 1346174541, 318665975, 1386973243, 2068370777, 1743532053, 1938090263, 140002775, 508594895, 2090245053, 749808927, 129154960, 458588259, 1509658265, 437928108, 95293711, 314484210, 75289718, 1813852092, 282475248, 1597888046, 2092164732, 817350100, 2061702027, 1023129505, 1107834619, 1429157786, 344185620, 698495685, 1281482744, 768094284, 462669257, 1362001122, 1573862875, 101929266, 1391900803, 1807130336, 258663571, 1912233250, 810641870, 755418454, 1019571747, 830889294, 545293946, 502534871, 108408486, 784559589, 1732267505, 2029909502, 1236261661, 1068367966, 1708006726, 1116666770, 1652354188, 1226060619, 126799939, 2018984925, 1995702671, 925036889, 767780551, 129154960, 1115195163, 421567013, 1039108999, 1166566974, 411610331, 1596168660, 1567987269, 1023129505, 755632436, 431830536, 1279743898, 412281976, 1404280277, 710298149, 834991544, 1525679890, 1427408395, 1597375815, 2104836583, 1796198013, 1478446500, 369810416, 684570284, 921588418, 1478446500, 1016172231, 1793029705, 92681611, 1882691654, 2063637012, 1760348380, 2068370777, 2023158304, 957828014, 1771024151, 476026938, 1051519024, 454233501, 320514917, 832861199, 382955827, 1799809564, 24301411, 789320623, 226693619, 809518878, 1849574026, 108408486, 167963455, 1227619357, 1668560561, 1419867460, 1399116812, 348318737, 231367331, 1617733963, 101472952, 1652354188, 1633413199, 258077411, 1362834839, 1301377875, 855007064, 895063367, 642607620, 316824711, 1897440708, 1451839080, 361813753, 943068411, 834991544, 1939824519, 669988453, 346645554, 127094733, 1698961257, 1130220829, 1863997494, 937186356, 368034323, 1812423302, 1901915393, 1796102645, 1518163458, 2003613928, 218352661, 331524561, 1600996760, 236507135, 1728536151, 1557429391, 572739356, 1476562292, 375495464, 839521935, 2064668381, 355207554, 357237149, 832633820, 1398644500, 1706993430, 428975318, 1333685349, 1025725763, 1008240337, 411980556, 512090638, 905333257, 1903766467, 957828014, 647229180, 1435106634, 1236261661, 897054848, 223548025, 1094482709, 1445244854, 1836275590, 1319631681, 171620202, 2023078858, 1441716380, 1545747466, 1706993430, 1615388026, 300298040, 681910961, 1647259578, 196178887, 1039108999, 647386831, 1303373801, 202296702, 1847320613, 344185620, 1174619516, 1926818415, 1414362804, 1030316713, 1300601359, 1051519024, 1148928565, 1377965112, 422305444, 1680351380, 1366488947, 288006428, 1318824510, 236828933, 1284660443, 1115195163, 6933753, 295741961, 746232674, 168068959, 463482573, 1617778549, 805392550, 1383594058, 684570284, 75099567, 501848670, 1977466362, 1768623322, 265963215, 2124639788, 521861728, 717918283, 897054848, 157863574, 304160661, 368064759, 2110010671, 2009907126, 1931706889, 1086531967, 342695013, 1283070433, 2098339998, 1124818674, 1391296201, 143542611, 737223707, 1457517398, 1250086894, 101929266, 1222648127, 413705650, 401203082, 490916524, 776531042, 1802082211, 795054872, 499521037, 1257726609, 9135230, 331211608, 1643966961, 2137730018, 1968456300, 702715826, 1448891846, 1295059760, 88949714, 377901841, 1111527895, 1596168660, 891421356, 1363045321, 1963590645, 1356871291, 985509753, 1626979009, 424052704, 12121599, 1420400195, 1866766832, 1927702195, 657821122, 1049077005, 1115438164, 302173464, 357571489, 1679953747, 1807130336, 571846522, 1121122751, 1545417697, 1185391677, 101331579, 1180715934, 1848682419, 1284660443, 622268743, 2088379000, 1017739961, 23646786, 331637304, 545293946, 961673224, 1227464302, 907527237, 1844185783, 2110010671, 194847407, 691321850, 172490260, 1708006726, 1228127126, 657262366, 567222277, 458588259, 1468762965, 853380695, 2050098033, 224582465, 1429157786, 1113746950, 1836275590, 1448716161, 185984466, 1812423302, 2018044935, 1219234986, 2083245268, 60393212, 176842855, 1887637, 265963215, 1691587939, 1955990214, 115307826, 1901915393, 706642600, 703299415, 717210241, 168068959, 1847320613, 1752800049, 1114919530, 31122986, 1416294892, 75289718, 1806282462, 1729784609, 1359861756, 2124639788, 1790245760, 1795739910, 164973470, 56564047, 1474833168, 1793372303, 352050956, 377901841, 312444007, 129412462, 421567013, 1351345222, 1618907919, 1784766669, 1936329093, 1260046957, 1503614726, 1148637873, 714335774, 6933753, 1927702195, 2008416045, 28222902, 542708780, 1558260931, 2001271630, 1743532053, 1630361895, 976308950, 880378029, 324436309, 1934004841, 565116026, 1524325967, 886559008, 393112637, 143542611, 1105222768, 407052493, 353474901, 737904106, 1115438164, 1860375801, 192958059, 988774856, 589673556, 892053143, 1213110678, 737904106, 1025725763, 1762940469, 1871067778, 582285527, 55642692, 1201779776, 234254368, 313952732, 1245245249, 1483764287, 118710298, 2077160141, 553324188, 374079594, 2040696005, 1947138150, 55835218, 1167620773, 775171660, 1377979804, 516341990, 931853945, 527116334, 688507583, 589673556, 2031439870, 590357943, 1189280589, 1709478703, 1238320298, 2008416045, 282442306, 1102730552, 1994557579, 706642600, 2098478514, 151592285, 817391552, 158592369, 977532866, 1823983984, 1057007322, 699723791, 2119315079, 349037106, 581326627, 905169660, 1362834839, 2098478514, 1346174541, 562165088, 1002804820, 516341990, 1463179851, 1133203852, 1288775054, 282475248, 1626979009, 2047567798, 1008240337, 1476562292, 1185044668, 1573243634, 1518163458, 889688007, 1118600159, 13455, 1735832450, 502767894, 1834458876, 34519890, 1505795334, 2063936097, 1842790973, 2038299452, 1078626765, 432969044, 313952732, 1386848198, 485622922, 175530179, 1966423893, 2083245268, 1543054039, 24301411, 1994802599, 450031624, 1525679890, 450031624, 866954864, 1427408395, 929481514, 277117594, 2051953943, 996502947, 172556928, 1402209416, 1382973413, 1320305309, 1569608120, 157863574, 1432063066, 530371949, 801783027, 688507583, 1461885894, 862332254, 56564047, 760910029, 1977466362, 578134255, 26760893, 756044144, 1207543207, 1597972594, 1667344271, 983645999, 1903958412, 407052493, 1931161863, 2111482796, 1567121209, 346645554, 1185044668, 1432063066, 192958059, 994411018, 1030316713, 1105222768, 370352185, 1618907919, 456880398, 499521037, 1796198013, 2092396111, 1167615734, 13618675, 1476211372, 334734506, 642551034, 337486259, 1849905493, 1528073013, 889119396, 2136018549, 1281934977, 85176240, 889688007, 1105548534, 334734506, 1143669835, 1790245760, 1846989859, 1651659859, 807175912, 1292798886, 342695013, 1163498602, 925188410, 604056197, 322791559, 1962408012, 1728536151, 1968456300, 2029909502, 787094441, 1822559360, 822102917, 1225521544, 341137845, 987333028, 606086946, 1705049327, 971307216, 1380786642, 270649485, 784559589, 524035689, 1045501369, 1999939613, 207314364, 2141370370, 1609005591, 1398556759, 889119396, 1509658265, 1845784857, 1848682419, 1407106871, 786651958, 2095688079, 911254351, 313517515, 1253448197, 1230900940, 207314364, 1135048761, 691812435, 567222277, 347077196, 348318737, 368034323, 1790318750, 2095688079, 171620202, 111398399, 2092396111, 305492631, 1215867946, 777512109, 357571489, 125998400, 947876490, 1114919530, 1377343944, 292554182, 1426671282, 959637303, 1227619357, 1863776405, 1244629629, 1135048761, 335255576, 62783386, 1026076957, 530483714, 172490260, 1215867946, 359242576, 1178402197, 1200676937, 220048635, 382578172, 127446721, 1329554607, 1833517718, 1508545801, 1777736810, 1488695710, 801783027, 2067859121, 1262976196, 127124945, 319518554, 911254351, 817350100, 874962868, 1712365580, 894946731, 681910961, 347221710, 855007064, 1300601359, 716335880, 1086531967, 2092651978, 790709217, 1962408012, 42146442, 1047738468, 4369626, 1885943300, 191110288, 304987843, 263081549, 1137522502, 520717814, 1501093334, 230168409, 1213110678, 580563898, 1843638690, 1038787536, 710298149, 1049077005, 342194329, 1091216404, 1137522502, 1762495481, 1476211372, 140002775, 1160834052, 273074997, 1421620239, 622268743, 219557883, 758332964, 191858533, 1087464376, 501848670, 866683783, 371358048, 1796102645, 2101995238, 711443275, 1502463516, 378859174, 329004855, 1333685349, 2119315079, 1422015859, 1567121209, 1398556759, 1795289991, 319518554, 594095776, 661122008, 1281409025, 2065708818, 1639709504, 259852785, 382955827, 3574159, 389036161, 428975318, 1152185683, 1936766545, 1790318750, 230168409, 1399116812, 832861199, 2107302437, 2001271630, 2047822109, 903866621, 1627507451, 109900669, 218264606, 1660439615, 235645468, 1026076957, 464685717, 1859513045, 368682266, 1779630009, 810641870, 224582465, 1508545801, 286245356, 592100847, 259181369, 610920364, 717918283, 1718056162, 13618675, 866683783, 1337482725, 464685717, 943010068, 434826719, 320514917, 1230900940, 1421620239, 983645999, 1973792142, 895063367, 231367331 };
     bit::TestClass::reset();
 
     {
         bit::sl_set<bit::TestClass> sls;
 
-        sls.insert_equal(rv);
-
-        ASSERT_EQ(sls.size(), rv.size());
-
-        ASSERT_EQ(0, bit::TestClass::init_ctor);
-        ASSERT_EQ(rv.size(), bit::TestClass::copy_ctor);
-        ASSERT_EQ(0, bit::TestClass::move_ctor);
-        ASSERT_EQ(0, bit::TestClass::copy_assign);
-        ASSERT_EQ(0, bit::TestClass::move_assign);
+        sls.insert_unique(rv);
 
         std::vector<bit::TestClass> tc(rv);
         std::sort(tc.begin(), tc.end());
+        auto it = std::unique(tc.begin(), tc.end());
+        tc.resize(it - tc.begin());
+
+        ASSERT_EQ(sls.size(), tc.size());
 
         auto slit = sls.begin();
         auto svit = tc.begin();
@@ -226,9 +161,9 @@ TEST(insert_equal, case5) {
     ASSERT_TRUE(bit::TestClass::check());
 }
 
-TEST(insert_equal, case6) {
+TEST(insert_unique, case4) {
     auto rv = bit::get_random_vector(1024);
-    auto sv = bit::get_sorted_vector(1024);
+    auto sv = bit::get_unique_vector(1024);
     bit::TestClass::reset();
 
     {
@@ -238,14 +173,21 @@ TEST(insert_equal, case6) {
 
         for (const auto &i : rv) {
             auto tmp = i;
-            auto it = sls.insert_equal(std::move(tmp));
-            ASSERT_EQ(ss.count(it.base()), 0);
-            ASSERT_EQ(i, *it);
-            ss.emplace(it.base());
+            auto s = sls.contain(i);
+            auto [it, status] = sls.insert_unique(std::move(tmp));
+            if (s) {
+                ASSERT_FALSE(status);
+                ASSERT_FALSE(it);
+            } else {
+                ASSERT_TRUE(status);
+                ASSERT_EQ(ss.count(it.base()), 0);
+                ASSERT_EQ(i, *it);
+                ss.emplace(it.base());
+            }
         }
 
-        ASSERT_EQ(ss.size(), rv.size());
-        ASSERT_EQ(sls.size(), rv.size());
+        ASSERT_EQ(ss.size(), sv.size());
+        ASSERT_EQ(sls.size(), sv.size());
 
         auto slit = sls.begin();
         auto svit = sv.begin();
@@ -256,16 +198,16 @@ TEST(insert_equal, case6) {
 
     ASSERT_EQ(0, bit::TestClass::init_ctor);
     ASSERT_EQ(rv.size(), bit::TestClass::copy_ctor);
-    ASSERT_EQ(rv.size(), bit::TestClass::move_ctor);
+    ASSERT_EQ(sv.size(), bit::TestClass::move_ctor);
     ASSERT_EQ(0, bit::TestClass::copy_assign);
     ASSERT_EQ(0, bit::TestClass::move_assign);
 
     ASSERT_TRUE(bit::TestClass::check());
 }
 
-TEST(insert_equal, case7) {
+TEST(insert_unique, case5) {
     auto rv = bit::get_random_vector(1024);
-    auto sv = bit::get_sorted_vector(1024);
+    auto sv = bit::get_unique_vector(1024);
     bit::TestClass::reset();
 
     {
@@ -274,14 +216,21 @@ TEST(insert_equal, case7) {
         std::unordered_set<void *>ss;
 
         for (const auto &i : rv) {
-            auto it = sls.emplace_equal(i.value);
-            ASSERT_EQ(ss.count(it.base()), 0);
-            ASSERT_EQ(i, *it);
-            ss.emplace(it.base());
+            auto s = sls.contain(i);
+            auto [it, status] = sls.emplace_unique(i.value);
+            if (s) {
+                ASSERT_FALSE(status);
+                ASSERT_FALSE(it);
+            } else {
+                ASSERT_TRUE(status);
+                ASSERT_EQ(ss.count(it.base()), 0);
+                ASSERT_EQ(i, *it);
+                ss.emplace(it.base());
+            }
         }
 
-        ASSERT_EQ(ss.size(), rv.size());
-        ASSERT_EQ(sls.size(), rv.size());
+        ASSERT_EQ(ss.size(), sv.size());
+        ASSERT_EQ(sls.size(), sv.size());
 
         auto slit = sls.begin();
         auto svit = sv.begin();
@@ -299,9 +248,9 @@ TEST(insert_equal, case7) {
     ASSERT_TRUE(bit::TestClass::check());
 }
 
-TEST(insert_equal, case8) {
+TEST(insert_unique, case6) {
     auto rv = bit::get_random_vector(1024);
-    auto sv = bit::get_sorted_vector(1024);
+    auto sv = bit::get_unique_vector(1024);
     bit::TestClass::reset();
 
     {
@@ -310,15 +259,22 @@ TEST(insert_equal, case8) {
         std::unordered_set<void *>ss;
 
         for (const auto &i : rv) {
-            auto it = slm.emplace_equal(i, i);
-            ASSERT_EQ(ss.count(it.base()), 0);
-            ASSERT_EQ(i, it->first);
-            ASSERT_EQ(i, it->second);
-            ss.emplace(it.base());
+            auto s = slm.contain(i);
+            auto [it, status] = slm.emplace_unique(i, i);
+            if (s) {
+                ASSERT_FALSE(status);
+                ASSERT_FALSE(it);
+            } else {
+                ASSERT_TRUE(status);
+                ASSERT_EQ(ss.count(it.base()), 0);
+                ASSERT_EQ(i, it->first);
+                ASSERT_EQ(i, it->second);
+                ss.emplace(it.base());
+            }
         }
 
-        ASSERT_EQ(ss.size(), rv.size());
-        ASSERT_EQ(slm.size(), rv.size());
+        ASSERT_EQ(ss.size(), sv.size());
+        ASSERT_EQ(slm.size(), sv.size());
 
         auto slit = slm.begin();
         auto svit = sv.begin();
@@ -339,16 +295,15 @@ TEST(insert_equal, case8) {
     ASSERT_TRUE(bit::TestClass::check());
 }
 
-TEST(insert_equal, case9) {
+TEST(insert_unique, case7) {
     auto rv = bit::get_random_vector(1024);
-    auto sv = bit::get_sorted_vector(1024);
+    auto sv = bit::get_unique_vector(1024);
     bit::TestClass::reset();
 
     {
         bit::sl_set<bit::TestClass> sls;
-        sls.insert_equal(rv.begin(), rv.end());
-
-        ASSERT_EQ(sls.size(), rv.size());
+        sls.insert_unique(rv.begin(), rv.end());
+        ASSERT_EQ(sls.size(), sv.size());
 
         auto slit = sls.begin();
         auto svit = sv.begin();
@@ -358,7 +313,7 @@ TEST(insert_equal, case9) {
     }
 
     ASSERT_EQ(0, bit::TestClass::init_ctor);
-    ASSERT_EQ(rv.size(), bit::TestClass::copy_ctor);
+    ASSERT_EQ(sv.size(), bit::TestClass::copy_ctor);
     ASSERT_EQ(0, bit::TestClass::move_ctor);
     ASSERT_EQ(0, bit::TestClass::copy_assign);
     ASSERT_EQ(0, bit::TestClass::move_assign);

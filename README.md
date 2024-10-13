@@ -1,70 +1,30 @@
 # Skip List
 
-## 谓词封装
-
-将输入的逻辑小于谓词封装为多种逻辑谓词
+## 模板简介
 
 ```c++
-class Comparator {
-public:
-    inline bool less(const Key &left, const Key &right) {
-        return m_c_(left, right);
-    }
-
-    inline bool greater(const Key &left, const Key &right) {
-        return less(right, left);
-    }
-
-    inline bool less_or_equal(const Key &left, const Key &right) {
-        return !greater(left, right);
-    }
-
-    inline bool greater_or_equal(const Key &left, const Key &right) {
-        return !less(left, right);
-    }
-
-    inline bool not_equal(const Key &left, const Key &right) {
-        return less(left, right) || right(left, right);
-    }
-
-    inline bool equal(const Key &left, const Key &right) {
-        return !not_equal(left, right);
-    }
-private:
-    Compare m_c_;
-};
+template <typename Key, typename Value, typename KeyOfValue, typename Compare, typename floor_number_type MaxFloorNumber = 32>
+class SkipList
 ```
 
-## 搜索
+|模板参数|解释|
+|---|---|
+|Key|键类型|
+|Value|值类型，值类型中应该包含键类型|
+|KeyOfValue|键提取器，从值对象中提取出键类型的仿函数|
+|Compare|比较器，对键类型进行比较的仿函数|
+|MaxFloorNumber|最高层数，默认为32|
 
-为了尽可能的利用构建的索引，从任意位置开始的向任意方向的搜索流程如下：
+## 类方法简介
 
-```c++
-iterator search(iterator pos, const Key &key, std::function<bool(const Key &, const Key &)> func) {
-    // 上升阶段：在此阶段只会发生楼层上升
-    //   1. 每次都尝试跳到最远的地方
-    //   2. 每次跳跃前判断目标是否符合条件
-    iterator next = pos.get_max_next();
-    while(next != end() && func(next, key)) {
-        pos = next;
-        next = pos.get_max_next();
-    }
+### 构造函数
 
-    // 下降阶段：此阶段只会发生楼层下降
-    //   1. 不断进行平跳，直到下一跳不符合条件
-    //   2. 降低一楼层
-    floor_number_type fn = pos.floor_number() - 1;
-    while(fn--) {
-        next = pos.get_index_next(fn);
+|函数定义|函数用途|参数|
+|----|----|----|
+|SkipList(double p = 0.5)|构造一个空的SkipList对象|p: 每层增长概率，默认为0.5|
+|template \<typename Iterator\><br>SkipList(Iterator first, Iterator last, double p = 0.5)|通过迭代器拷贝其他容器内容的构造函数|first: 起始迭代器<br>last: 终点迭代器<br>p: 每层增长概率，默认为0.5|
+|SkipList(std::initializer_list<value_type> ilist, double p = 0.5)|通过初始化列表初始化的构造函数|ilist: 初始化列表<br>p: 每层增长概率，默认为0.5|
+|SkipList(const self &sl)|拷贝构造函数|sl: 拷贝目标|
+|SkipList(self &&sl)|移动构造函数|sl: 移动目标|
 
-        while(next != end() && func(next, key)) {
-            pos = next;
-            next = pos.get_index_next(fn);
-        }
-    }
-
-    return next;
-}
-```
-
-## 
+...

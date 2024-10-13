@@ -249,8 +249,6 @@ public:
         void swap(NodeHandler &nh) {
         }
 
-
-
         NodeHandler(const NodeHandler &) = delete;
         NodeHandler &operator=(const NodeHandler &) = delete;
     private:
@@ -298,6 +296,22 @@ public:
         return reverse_iterator(end);
     }
 
+    reference front() {
+        return *begin();
+    }
+
+    const value_type &front() const {
+        return *begin();
+    }
+
+    reference back() {
+        return *(--end());
+    }
+
+    const value_type &back() const {
+        return *(--end());
+    }
+
     size_type size() const {
         return m_size_;
     }
@@ -329,7 +343,8 @@ public:
         static_assert(MaxFloorNumber > 0, "MaxFloorNumber should greater than zero!");
     }
 
-    explicit SkipList(iterator first, iterator last, double p = 0.5) :
+    template <typename Iterator>
+    explicit SkipList(Iterator first, Iterator last, double p = 0.5) :
         SkipList(p) {
         insert_equal(first, last);
     }
@@ -432,19 +447,25 @@ public:
         return emplace_equal(value);
     }
 
+    iterator insert_equal(value_type &&value) {
+        return emplace_equal(std::move(value));
+    }
+
     iterator insert_equal(size_type n, const value_type &value) {
-        iterator ret = end();
+        iterator ret;
         while (n--) {
             ret = insert_equal(value);
         }
         return ret;
     }
 
-    iterator insert_equal(iterator it) {
+    template <typename Iterator>
+    iterator insert_equal(Iterator it) {
         return insert_equal(*it);
     }
 
-    void insert_equal(iterator first, iterator last) {
+    template <typename Iterator>
+    void insert_equal(Iterator first, Iterator last) {
         while (first != last) {
             insert_equal(first++);
         }
@@ -479,16 +500,13 @@ public:
         return { insert_unsafe(pos, create_node(std::move(value))), true };
     }
 
-    std::pair<iterator, bool> insert_unique(iterator it) {
+    template <typename Iterator>
+    std::pair<iterator, bool> insert_unique(Iterator it) {
         return insert_unique(*it);
     }
 
-    std::pair<iterator, bool> insert_unique(size_type n, const value_type &value) {
-        return std::min(static_cast<size_type>(1), n) ?
-            insert_unique(value) : std::make_pair(iterator(), true);
-    }
-
-    void insert_unique(iterator first, iterator last) {
+    template <typename Iterator>
+    void insert_unique(Iterator first, Iterator last) {
         while (first != last) {
             insert_unique(first++);
         }
@@ -496,7 +514,7 @@ public:
 
     void insert_unique(std::initializer_list<value_type> ilist) {
         for (const auto &i : ilist) {
-            insert_equal(i);
+            insert_unique(i);
         }
     }
 
@@ -508,12 +526,12 @@ public:
             destory_node(it);
             return { iterator(), false };
         }
-        return { insert_unsafe(pos, create_node(it)), true };
+        return { insert_unsafe(pos, it), true };
     }
 
     iterator erase(iterator pos) {
         iterator it = pos++;
-        it = extract(it);
+        it = extract_unsafe(it);
         destory_node(it);
         return pos;
     }
@@ -532,10 +550,25 @@ public:
         }
         return it;
     }
-
-    iterator extract(iterator it) {
+public:
+    void unique() {
+        if (empty()) {
+            return;
+        }
+        iterator it = begin();
+        while (it != end()) {
+            iterator tmp = it;
+            ++tmp;
+            if (tmp == end() || m_c_.greater(m_kov_(*tmp), m_kov_(*it))) {
+                it = tmp;
+            } else {
+                erase(tmp);
+            }
+        }
+    }
+private:
+    iterator extract_unsafe(iterator it) {
         floor_number_type fn = it.floor_number();
-        floor_type *fnp = it.floor();
         for (floor_number_type ifn = 0; ifn < fn; ++ifn) {
             iterator npos = it.get_index_next(ifn);
             iterator ppos = it.get_index_prev(ifn);
@@ -547,207 +580,9 @@ public:
             it.set_next_floor(ifn, it);
         }
         it.m_head_ = nullptr;
-        --m_size_;
         return it;
     }
-
-    iterator extract(iterator first, iterator last) {
-        if (first == last) {
-            return end();
-        }
-
-        iterator pBegin = first;
-        iterator pEnd = last;
-        --pEnd;
-
-        // 双指针，尽可能的走索引加快统计
-        floor_number_type fn = 0;
-        while (pBegin != pEnd) {
-
-            // 获取的pBegin为前向节点，pEnd为后向节点
-            iterator pp = pBegin.get_index_prev(fn);
-            iterator np = pEnd.get_index_next(fn);
-
-            np.set_prev_floor(fn, pp);
-            pp.set_next_floor(fn, np);
-
-            pBegin.set_prev_floor(fn, pEnd);
-            pEnd.set_next_floor(fn, pBegin);
-
-            ++fn;
-
-            while (pBegin != pEnd && pBegin.floor_number() <= fn) {
-                pBegin = pBegin.get_index_next(fn);
-            }
-            while (pBegin != pEnd && pEnd.floor_number() <= fn) {
-                pEnd = pEnd.get_index_prev(fn);
-            }
-        }
-
-        if (pBegin == pEnd) {
-            floor_type *p = pBegin.floor();
-            floor_number_type pfn = pBegin.floor_number();
-            while (fn < pfn) {
-                pBegin.set_prev_floor(fn, pEnd);
-                pEnd.set_next_floor(fn, pBegin);
-                ++fn;
-            }
-        }
-
-        // 进行统计
-        iterator p = first;
-        while (p != last) {
-            p.m_head_ = nullptr;
-            --m_size_;
-            ++p;
-        }
-
-        return first;
-    }
-
-    iterator extract(const key_type &key) {
-        iterator first = lower_bound(key);
-        iterator last = upper_bound(key);
-        return extract(first, last);
-    }
-
-    void merge(iterator it) {
-        iterator pos = lower_bound(m_kov_(*it));
-        insert_unsafe(pos, it);
-        ++m_size_;
-    }
-
-    // 先找到插入前点，在进行插入
-    void merge(iterator first, iterator last) {
-        if (first == last) {
-            return;
-        }
-
-        iterator pos = lower_bound(m_kov_(*first++));
-
-
-    }
-
-    void merge(self &sl, iterator it) {
-        merge(sl.extract(it));
-    }
-
-    void merge(self &sl, iterator first, iterator last) {
-        merge(sl.extract(first, last));
-    }
-
-    void merge(self &sl) {
-        merge(sl.extract(sl.begin(), sl.end()));
-    }
 private:
-    // 从pos（包括pos）向后第一个小于等于key
-    iterator lower_bound_hint(iterator pos, const key_type &key) {
-        // 上升阶段，其够到的最远节点仍小于key
-        floor_number_type fn = pos.floor_number();
-        iterator next = pos.get_max_link();
-        while (next != end() && m_c_.less(m_kov_(*next), key)) {
-            fn = next.floor_number();
-            pos = next;
-            next = pos.get_max_link();
-        }
-        // 下降阶段
-        while (fn--) {
-            next = pos.get_index_next(fn);
-            while (next != end() && m_c_.less(m_kov_(*next), key)) {
-                pos = next;
-                next = pos.get_index_next(fn);
-            }
-        }
-        return next;
-    }
-
-    // 从pos（包括pos）向后第一个小于等于key
-    iterator upper_bound_hint(iterator pos, const key_type &key) {
-        // 上升阶段，其够到的最远节点仍小于key
-        floor_number_type fn = pos.floor_number();
-        iterator next = pos.get_max_link();
-        while (next != end() && m_c_.less_or_equal(m_kov_(*next), key)) {
-            fn = next.floor_number();
-            pos = next;
-            next = pos.get_max_link();
-        }
-        // 下降阶段
-        while (fn--) {
-            next = pos.get_index_next(fn);
-            while (next != end() && m_c_.less_or_equal(m_kov_(*next), key)) {
-                pos = next;
-                next = pos.get_index_next(fn);
-            }
-        }
-        return next;
-    }
-
-    // 合并一段[first, last]到pos前
-    iterator merge_unsafe(iterator pos, iterator first, iterator last) {
-        iterator ret = pos;
-
-        iterator prev = pos;
-        --prev;
-
-        // 自底向上，逐层连接
-
-        floor_number_type fn = 0;
-
-        while (first != last) {
-            // 解开前向
-            prev.set_next_floor(fn, first);
-            first.set_prev_floor(fn, prev);
-
-            // 解开后向
-            pos.set_prev_floor(fn, last);
-            last.set_next_floor(fn, pos);
-
-            ++fn;
-
-            while (fn >= first.floor_number()) {
-                first = first.get_max_link();
-            }
-
-            while (fn >= last.floor_number()) {
-                last = last.get_min_link();
-            }
-
-            while (fn >= pos.floor_number()) {
-                pos = pos.get_max_link();
-            }
-
-            while (fn >= prev.floor_number()) {
-                prev = prev.get_min_link();
-            }
-        }
-
-        if (first == last) {
-            floor_number_type pfn = first.floor_number();
-
-            while (fn < pfn) {
-                // 解开前向
-                prev.set_next_floor(fn, first);
-                first.set_prev_floor(fn, prev);
-
-                // 解开后向
-                pos.set_prev_floor(fn, last);
-                last.set_next_floor(fn, pos);
-
-                ++fn;
-
-                while (fn >= pos.floor_number()) {
-                    pos = pos.get_max_link();
-                }
-
-                while (fn >= prev.floor_number()) {
-                    prev = prev.get_min_link();
-                }
-            }
-        }
-
-        return ret;
-    }
-
     iterator insert_unsafe(iterator pos, iterator it) {
         floor_number_type itfn = it.floor_number();
         floor_number_type posfn = pos.floor_number();
