@@ -8,7 +8,24 @@ namespace bit {
 namespace __detail {
 
 struct SkipListNodeBase {
+public:
     using floor_number_type = typename std::default_random_engine::result_type;
+public:
+    constexpr static floor_number_type FLOOR_MASK = (~0u) >> 1;
+    constexpr static floor_number_type LOAD_MASK = (~FLOOR_MASK);
+public:
+    const floor_number_type floor_number;
+public:
+    SkipListNodeBase(floor_number_type fn) : floor_number(fn) {
+    }
+
+    floor_number_type getFloorNumber() const {
+        return floor_number & FLOOR_MASK;
+    }
+
+    bool hasLoad() const {
+        return !(floor_number & LOAD_MASK);
+    }
 };
 
 struct SkipListNodeFloor {
@@ -17,33 +34,31 @@ struct SkipListNodeFloor {
 };
 
 template <typename T>
-struct SkipListNode : public SkipListNodeBase {
+struct SkipListNode final : public SkipListNodeBase {
 public:
     T value;
-    const floor_number_type floor_number;
     SkipListNodeFloor floor[0];
-
+public:
     template <typename ... Args>
     explicit SkipListNode(floor_number_type fn, Args&& ... args) :
-        value(std::forward<Args>(args)...),
-        floor_number(fn) {
-        std::uninitialized_fill_n(floor, floor_number, SkipListNodeFloor{ this, this });
+        SkipListNodeBase(fn),
+        value(std::forward<Args>(args)...) {
+        std::uninitialized_fill_n(floor, floor_number,
+                                  SkipListNodeFloor{ this, this });
     }
 };
 
 template <>
-struct SkipListNode<void> : public SkipListNodeBase {
+struct SkipListNode<void> final : public SkipListNodeBase {
 public:
-    floor_number_type floor_number;
     SkipListNodeFloor floor[0];
-
-    template <typename ... Args>
+public:
     explicit SkipListNode(floor_number_type fn) :
-        floor_number(fn) {
-        std::uninitialized_fill_n(floor, floor_number, SkipListNodeFloor{ this, this });
+        SkipListNodeBase(fn | LOAD_MASK) {
+        std::uninitialized_fill_n(floor, getFloorNumber(),
+                                  SkipListNodeFloor{ this, this });
     }
 };
-
 
 } // namespace __detail
 
@@ -102,8 +117,7 @@ public:
             typename __detail::SkipListNodeBase::floor_number_type;
         using floor_type = __detail::SkipListNodeFloor;
     public:
-        explicit SkipListIterator(base_type pBase = nullptr, base_type m_head_ = nullptr) :
-            m_head_(m_head_),
+        explicit SkipListIterator(base_type pBase = nullptr) :
             m_ptr_(pBase) {
         }
 
@@ -111,15 +125,12 @@ public:
         self &operator=(const self &) = default;
 
         SkipListIterator(self &&it) : SkipListIterator(it) {
-            it.m_head_ = nullptr;
             it.m_ptr_ = nullptr;
         }
 
         self &operator=(self &&it) {
             if (this != &it) {
                 *this = it;
-
-                it.m_head_ = nullptr;
                 it.m_ptr_ = nullptr;
             }
             return *this;
@@ -180,7 +191,7 @@ public:
         }
 
         inline floor_number_type floor_number() const {
-            return is_head() ? to_head()->floor_number : to_node()->floor_number;
+            return m_ptr_->getFloorNumber();
         }
 
         inline floor_type *floor() const {
@@ -188,11 +199,11 @@ public:
         }
 
         inline self get_index_prev(floor_number_type fn) const {
-            return self(floor()[fn].prev, m_head_);
+            return self(floor()[fn].prev);
         }
 
         inline self get_index_next(floor_number_type fn) const {
-            return self(floor()[fn].next, m_head_);
+            return self(floor()[fn].next);
         }
 
         inline self get_max_link() const {
@@ -212,10 +223,9 @@ public:
         }
 
         inline bool is_head() const {
-            return m_head_ == m_ptr_;
+            return !(m_ptr_->hasLoad());
         }
     private:
-        base_type m_head_;
         base_type m_ptr_;
     };
 public:
@@ -579,7 +589,6 @@ private:
             it.set_prev_floor(ifn, it);
             it.set_next_floor(ifn, it);
         }
-        it.m_head_ = nullptr;
         return it;
     }
 private:
@@ -613,7 +622,7 @@ private:
             sizeof(skip_list_head) + MaxFloorNumber * sizeof(floor_type));
         std::allocator_traits<std::allocator<skip_list_head>>().construct(
             alloc, p, MaxFloorNumber);
-        return iterator{ p, p };
+        return iterator(p);
     }
 
     template <typename ... Args>
@@ -625,7 +634,7 @@ private:
         std::allocator_traits<std::allocator<skip_list_node>>().construct(
             alloc, p, fn, std::forward<Args>(args)...);
         ++m_size_;
-        return iterator{ p, m_it_.m_head_ };
+        return iterator(p);
     }
 
     void destory_head(iterator it) {
