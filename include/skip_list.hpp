@@ -229,43 +229,6 @@ public:
         base_type m_ptr_;
     };
 public:
-    class NodeHandler {
-    public:
-        using key_type = Key;
-        using value_type = Value;
-
-        using size_type = std::size_t;
-
-        using iterator = SkipListIterator;
-    public:
-        NodeHandler() : NodeHandler(iterator(), 0) {
-        }
-
-        explicit NodeHandler(iterator it) : NodeHandler(it, 1) {
-        }
-
-        explicit NodeHandler(iterator it, size_type s) : m_it_(it), m_size_(s) {
-        }
-
-        NodeHandler(NodeHandler &&nh) {
-        }
-
-        NodeHandler &operator=(NodeHandler &&nh) {
-        }
-
-        ~NodeHandler() {
-        }
-
-        void swap(NodeHandler &nh) {
-        }
-
-        NodeHandler(const NodeHandler &) = delete;
-        NodeHandler &operator=(const NodeHandler &) = delete;
-    private:
-        iterator m_it_;
-        size_type m_size_;
-    };
-public:
     using key_type = Key;
     using value_type = Value;
 
